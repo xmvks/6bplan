@@ -13,6 +13,7 @@
     th { background: #f0f0f0; }
     button { margin: 5px; padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; background: #007bff; color: white; }
     button:disabled { background: #ccc; cursor: not-allowed; }
+    input { width: 100%; border: none; text-align: center; }
   </style>
 </head>
 <body>
@@ -22,7 +23,10 @@
     <input type="text" id="login" placeholder="Login" /><br><br>
     <input type="password" id="password" placeholder="Hasło" /><br><br>
     <button onclick="login()">Zaloguj</button>
+    <p><b>Admin:</b> login: xmvks, hasło: mysubsarethebest</p>
+    <p><b>Gość:</b> login: gosc, hasło: (puste)</p>
   </div>
+
   <div class="plan-box" id="planBox" style="display:none;">
     <h2>Plan Lekcji</h2>
     <div>
@@ -44,24 +48,27 @@
     </table>
   </div>
 </div>
+
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbyZ5cVJh4gbeHRjdZpSDXtJOZrS_4FDPLHTVFK9KtzKSmsawxTZaK8a3oe85_fTVX1b/exec";
+const API_URL = "TU_WSTAW_SWÓJ_LINK_Z_APPS_SCRIPT"; // <--- tu wkleisz link z GAS
 let isGuest = false;
 
+// Pobierz plan z Google Sheets
 async function fetchPlan() {
   try {
     const res = await fetch(API_URL);
     const data = await res.json();
-    if (!Array.isArray(data)) {
-      throw new Error("Odpowiedź API nie jest tablicą: " + JSON.stringify(data));
+    if (!data || !data.values || !Array.isArray(data.values)) {
+      throw new Error("Odpowiedź API nie ma tablicy 'values'");
     }
-    return data;
+    return data.values;
   } catch (e) {
     alert("Błąd ładowania danych: " + e.message);
     return [["Godzina","Pon","Wto","Śro","Czw","Pią"]];
   }
 }
 
+// Zapisz plan do Google Sheets
 async function savePlan() {
   if(isGuest) return;
   const rows = [...document.querySelectorAll('#planTable tbody tr')].map(tr =>
@@ -72,15 +79,16 @@ async function savePlan() {
     const res = await fetch(API_URL, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
+      body: JSON.stringify({values: payload})
     });
     const json = await res.json();
-    alert("Zapisano: " + JSON.stringify(json));
+    alert("Zapisano: " + json.status);
   } catch(e) {
     alert("Błąd zapisu: " + e.message);
   }
 }
 
+// Wypełnij tabelę danymi
 function fillTable(plan) {
   const tbody = document.querySelector('#planTable tbody');
   tbody.innerHTML = '';
@@ -98,6 +106,7 @@ function fillTable(plan) {
   });
 }
 
+// Dodaj nowy wiersz
 function addRow() {
   const tbody = document.querySelector('#planTable tbody');
   const tr = document.createElement('tr');
@@ -111,6 +120,7 @@ function addRow() {
   tbody.appendChild(tr);
 }
 
+// Logowanie
 async function login() {
   const u = document.getElementById('login').value.trim();
   const p = document.getElementById('password').value.trim();
