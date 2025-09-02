@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plan lekcji – logowanie</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f0f0f0; margin: 0; padding: 0; }
+    .container { max-width: 900px; margin: auto; padding: 20px; }
+    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 20px; margin-top: 50px; }
+    h1, h2 { text-align: center; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    table, th, td { border: 1px solid #ccc; }
+    th, td { padding: 8px; text-align: center; }
+    button { margin: 5px; padding: 8px 12px; border: none; background: #007BFF; color: #fff; border-radius: 5px; cursor: pointer; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    input[type="text"], input[type="password"] { width: calc(100% - 20px); padding: 8px; margin: 5px 0; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div id="loginView" class="card">
+    <h1>Logowanie</h1>
+    <input id="login" type="text" placeholder="Login" />
+    <input id="password" type="password" placeholder="Hasło (puste dla gościa)" />
+    <button onclick="login()">Zaloguj</button>
+    <p id="loginError" style="color:red;text-align:center;"></p>
+  </div>
+
+  <div id="planView" class="card" style="display:none;">
+    <h2>Plan lekcji</h2>
+    <div style="text-align:center;margin-bottom:10px;">
+      <button id="addRowBtn" onclick="addRow()">Dodaj wiersz</button>
+      <button id="saveBtn" onclick="saveData()">Zapisz teraz</button>
+      <button onclick="window.print()">Drukuj</button>
+    </div>
+    <table id="timetable">
+      <thead>
+        <tr>
+          <th>Godzina</th>
+          <th>Pon</th>
+          <th>Wt</th>
+          <th>Śr</th>
+          <th>Czw</th>
+          <th>Pt</th>
+          <th>Usuń</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbyZ5cVJh4gbeHRjdZpSDXtJOZrS_4FDPLHTVFK9KtzKSmsawxTZaK8a3oe85_fTVX1b/exec';
+const EDIT_LOGIN = 'xmvks';
+const EDIT_PASS = 'mysubsarethebest';
+let isReadOnly = true;
+
+async function login() {
+  const l = document.getElementById('login').value.trim();
+  const p = document.getElementById('password').value.trim();
+  const error = document.getElementById('loginError');
+
+  if (l === 'gosc' && p === '') {
+    isReadOnly = true;
+  } else if (l === EDIT_LOGIN && p === EDIT_PASS) {
+    isReadOnly = false;
+  } else {
+    error.textContent = 'Niepoprawne dane logowania!';
+    return;
+  }
+
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('planView').style.display = 'block';
+  await loadData();
+}
+
+function renderTable(data) {
+  const tbody = document.querySelector('#timetable tbody');
+  tbody.innerHTML = '';
+  data.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    row.forEach((cell, j) => {
+      const td = document.createElement('td');
+      if (!isReadOnly && j < 6) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = cell;
+        input.oninput = e => data[i][j] = e.target.value;
+        td.appendChild(input);
+      } else {
+        td.textContent = cell;
+      }
+      tr.appendChild(td);
+    });
+    const tdDel = document.createElement('td');
+    if (!isReadOnly) {
+      const btn = document.createElement('button');
+      btn.textContent = 'X';
+      btn.onclick = () => { data.splice(i,1); renderTable(data); };
+      tdDel.appendChild(btn);
+    }
+    tr.appendChild(tdDel);
+    tbody.appendChild(tr);
+  });
+  document.getElementById('addRowBtn').disabled = isReadOnly;
+  document.getElementById('saveBtn').disabled = isReadOnly;
+}
+
+async function loadData() {
+  try {
+    const res = await fetch(API_URL);
+    const json = await res.json();
+    const data = json.slice(1); // skip header
+    window.tableData = data.map(r => [r[0]||'', r[1]||'', r[2]||'', r[3]||'', r[4]||'', r[5]||'']);
+    renderTable(window.tableData);
+  } catch(e) {
+    alert('Błąd ładowania danych: ' + e);
+    window.tableData = [];
+  }
+}
+
+function addRow() {
+  window.tableData.push(['','','','','','']);
+  renderTable(window.tableData);
+}
+
+async function saveData() {
+  if (isReadOnly) return;
+  try {
+    const values = [['time','mon','tue','wed','thu','fri'], ...window.tableData];
+    await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify(values),
+      headers: { 'Content-Type': 'application/json' }
+    });
+    alert('Zapisano!');
+  } catch(e) {
+    alert('Błąd zapisu: ' + e);
+  }
+}
+</script>
+</body>
+</html>
